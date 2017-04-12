@@ -5,9 +5,16 @@ A Polymer Element that does an elasticsearch query and uses the results to creat
 Example:
 ```html
   <drops-query-and-timeline
-    data="[[data]]"
-    timestamps="[[dates]]"
-    info="{{_info}}">
+    client="[[esclient]]"
+    index="mockads"
+    date-hist-name="dates"
+    date-hist-field="date"
+    location-agg-name="locations"
+    location-agg-field="city"
+    index-types='["ad"]'
+    filter-list='[]'
+    query="[[query]]"
+    transform="[[eventDropsTimeline]]">
   </drops-query-and-timeline>
 ```
 
