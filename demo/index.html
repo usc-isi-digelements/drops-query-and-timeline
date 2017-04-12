@@ -1,0 +1,110 @@
+<!--
+Copyright 2017 Next Century Corporation
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+    <title>drops-query-and-timeline Demo</title>
+    <script src="../../webcomponentsjs/webcomponents-lite.min.js"></script>
+    <link rel="import" href="../drops-query-and-timeline.html">
+    <link rel="import" href="../../elastic-client/elastic-client.html">
+    <link rel="import" href="../../elastic-client-query-builder/elastic-client-query-builder.html">
+  </head>
+  <body unresolved>
+    <template is="dom-bind" id="demo">
+      <span>Drops query and timeline example:</span>
+      <br/><br/>
+      <elastic-client
+        config='{"host": "http://localhost:9200"}'
+        client="{{esclient}}"
+        cluster-status="{{myStatus}}">
+      </elastic-client>
+
+      <elastic-client-query-builder
+        type="match"
+        fields='"state"'
+        values='"TN"'
+        ejs-query="{{tennAdsQuery}}">
+      </elastic-client-query-builder>
+     
+      <drops-query-and-timeline
+        client="[[esclient]]"
+        index="mockads"
+        date-hist-name="dates"
+        date-hist-field="date"
+        location-agg-name="locations"
+        location-agg-field="city"
+        index-types='["ad"]'
+        filter-list='[]'
+        query="[[tennAdsQuery]]"
+        transform="[[eventDropsTimeline]]">
+      </drops-query-and-timeline>
+    </template>
+    <script>
+      (function(document) {
+        var demo = document.querySelector('#demo');
+
+        demo.createEventDropsTimeline = function(buckets) {
+          var locations = [];
+          var dates = [];
+
+          buckets.forEach(function(bucket) {
+
+            if(bucket.key === 'city') {
+              return false;
+            }
+
+            /* jscs:disable requireCamelCaseOrUpperCaseIdentifiers */
+            var topLevelObject  = {
+              count: bucket.doc_count,
+              name: bucket.key + ', tn',
+              dates: []
+            };
+            /* jscs:enable requireCamelCaseOrUpperCaseIdentifiers */
+
+            bucket.dates.buckets.forEach(function(date) {
+              /* jscs:disable requireCamelCaseOrUpperCaseIdentifiers */
+              var dateArrayObject = {
+                count: date.doc_count,
+                date: new Date(date.key),
+                name: bucket.key
+              };
+              /* jscs:enable requireCamelCaseOrUpperCaseIdentifiers */
+
+              topLevelObject.dates.push(dateArrayObject);
+
+              if(dates.indexOf(date.key) === -1) {
+                dates.push(date.key);
+              }
+            });
+            locations.push(topLevelObject);
+          });
+
+          return {
+            locations: locations,
+            dates: dates
+          };
+        };
+
+        demo.eventDropsTimeline = function(data) {
+          return (data && data.aggregations) ? demo.createEventDropsTimeline(data.aggregations.locations.locations.buckets) : {};
+        };
+
+      })(document);
+    </script>
+  </body>
+</html>

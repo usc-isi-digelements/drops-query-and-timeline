@@ -1,0 +1,427 @@
+<!--
+Copyright 2017 Next Century Corporation
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<link rel="import" href="../polymer/polymer.html">
+<link rel="import" href="../iron-collapse/iron-collapse.html">
+<link rel="import" href="../iron-flex-layout/iron-flex-layout-classes.html">
+<link rel="import" href="../iron-icon/iron-icon.html">
+<link rel="import" href="../iron-icons/iron-icons.html">
+<link rel="import" href="../elastic-client-search/elastic-client-search.html">
+<link rel="import" href="../elastic-client-aggregation-builder/elastic-client-aggregation-builder.html">
+<link rel="import" href="../json-combine/json-combine.html">
+<link rel="import" href="../drops-timeline/drops-timeline.html">
+<link rel="import" href="../array-behavior/array-behavior.html">
+
+<!--
+A Polymer Element that does an elasticsearch query and uses the results to create a timeline display.
+
+### Example
+```html
+  <drops-query-and-timeline
+    client="[[esclient]]"
+    index="mockads"
+    date-hist-name="dates"
+    date-hist-field="date"
+    location-agg-name="locations"
+    location-agg-field="city"
+    index-types='["ad"]'
+    filter-list='[]'
+    query="[[query]]"
+    transform="[[eventDropsTimeline]]">
+  </drops-query-and-timeline>
+```
+
+@demo demo/index.html
+-->
+
+<dom-module id="drops-query-and-timeline">
+  <template>
+    <style include="iron-flex"></style>
+    <style>
+      :host {
+        display: block;
+      }
+
+      .info, .help {
+        /* Match the style of the label in the zoomable-bar-chart */
+        font-size: 14px;
+        font-weight: bold;
+      }
+
+      .timeline {
+        margin-top: 20px;
+        margin-bottom: 20px;
+      }
+
+      .help {
+        cursor: pointer;
+        margin-bottom: 10px;
+      }
+
+      .icon {
+        --iron-icon-height: 20px;
+        --iron-icon-width: 20px;
+        margin-right: 10px;
+      }
+
+      .collapse {
+        font-size: 14px;
+        margin-left: 10px;
+        margin-right: 10px;
+      }
+    </style>
+
+    <elastic-client-aggregation-builder
+      name="[[dateHistName]]"
+      type="date_histogram"
+      interval="[[dateInterval]]"
+      field="[[dateHistField]]"
+      ejs-aggregation="{{_dateAggregation}}">
+    </elastic-client-aggregation-builder>
+
+    <elastic-client-aggregation-builder
+      name="[[locationAggName]]"
+      type="terms"
+      count="0"
+      order="_term"
+      direction="asc"
+      field="[[locationAggField]]"
+      nested-aggregations="[[buildArray(_dateAggregation)]]"
+      ejs-aggregation="{{_locationAggregation}}">
+    </elastic-client-aggregation-builder>
+
+    <!-- set page size/hits to zero since we only need aggregation here -->
+    <elastic-client-search
+      client="[[client]]"
+      page-size="0"
+      index="[[index]]"
+      elastic-types="[[indexTypes]]"
+      query="[[query]]"
+      aggregations="[[buildArray(_locationAggregation)]]"
+      filters="[[filterList]]"
+      results="{{_queryResults}}"
+      loading="{{loading}}"
+      last-error="{{error}}">
+    </elastic-client-search>
+
+    <json-combine
+      data-in1="[[_queryResults]]"
+      data-in2="[[locationId]]"
+      data-out="{{data}}"
+      combine-function="[[transform]]">
+    </json-combine>
+
+    <div class="layout horizontal center info">
+      [[_info]]
+    </div>
+
+    <drops-timeline class="timeline"
+      data="[[data.locations]]"
+      timestamps="[[data.dates]]"
+      info="{{_info}}"
+      name-property="{{nameProperty}}"
+      date-property="{{dateProperty}}"
+      count-property="{{countProperty}}">
+    </drops-timeline> 
+
+    <div class="layout horizontal center help" on-tap="_toggleEventDropsTimelineHelp">
+      <iron-icon icon="help" class="icon"></iron-icon>
+      How to Use the Drops Timeline (Click to Show/Hide)
+    </div>
+
+    <iron-collapse id="eventDropsTimelineHelp" class="collapse">
+      <ul>
+        <li>Click on the timeline and drag left or right to move the date range.</li>
+        <li>Scroll up or down using your mouse wheel to change the date scale.</li>
+        <li>The counts in each label on the left will update based on the current date range.</li>
+        <li>Click the Reset Timeline button at any time to show the original timeline.</li>
+      </ul>
+    </iron-collapse>
+  </template>
+  <script>
+  (function() {
+    'use strict';
+
+    Polymer({
+      is: 'drops-query-and-timeline',
+
+      behaviors: [DigBehaviors.ArrayBehavior],
+
+      properties: {
+        /**
+         * (Required)
+         *
+         * An instance of elasticsearch.Client which is connected to an elasticsearch server.
+         *
+         * @type {Object}
+         */
+        client: {
+          type: Object
+        },
+
+        /**
+         * (Required)
+         *
+         * The elasticsearch index to query.
+         *
+         * @type {String}
+         */
+        index: {
+          type: String
+        },
+
+        /**
+         * (Required)
+         *        
+         * The elasticsearch types to query for within this index.
+         *
+         * @type {Array}
+         */
+        indexTypes: {
+          type: Array
+        },
+
+        /**
+         * (Required)
+         *
+         * Name for date histogram aggregation query.
+         *
+         * @type {String}
+         */
+        dateHistName: {
+          type: String
+        },
+
+        /**
+         * (Required)
+         *
+         * Field to query against for date histogram aggregation.
+         *
+         * @type {String}
+         */
+        dateHistField: {
+          type: String
+        },
+
+        /**
+         * (Optional)
+         *
+         * Interval used for date histogram query. Defaults to 'day'.
+         *
+         * @type {String}
+         * @default 'day'         
+         */
+        dateInterval: {
+          type: String,
+          value: 'day'
+        },
+
+        /**
+         * (Required)
+         *
+         * Name for location aggregation query.
+         *
+         * @type {String}
+         */
+        locationAggName: {
+          type: String
+        },
+
+        /**
+         * (Required)
+         *
+         * Field to query against for location aggregation query.
+         *
+         * @type {String}
+         */
+        locationAggField: {
+          type: String
+        },
+
+        /**
+         * (Required)
+         *
+         * The list of elasticjs filters used in the event drops timeline query run by this component.
+         *
+         * @type {Array}
+         */
+        filterList: {
+          type: Array,
+          notify: true
+        },
+
+        /**
+         * (Required)
+         *
+         * Query to get the data to be used for the event drops timeline.
+         *
+         * @type {Object}
+         */
+        query: {
+          type: Object
+        },
+
+        /**
+         * (Optional)
+         *
+         * The location ID to give to the transform.
+         *
+         * @type {Number}
+         * @default null
+         */
+        locationId: {
+          type: Number,
+          value: null
+        },
+
+        /**
+         * (Required)
+         *
+         * The transform for the event drops timeline query results.
+         *
+         * @type {Object}
+         */
+        transform: {
+          type: Object
+        },
+
+        /**
+         * (Output)
+         *
+         * Whether the event drops query run by this component is loading.
+         *
+         * @type {Boolean}
+         */
+        loading: {
+          type: Boolean,
+          notify: true
+        },
+
+        /**
+         * (Output)
+         *
+         * Error returned by event drops query (if any).
+         *
+         * @type {Object}
+         */
+        error: {
+          type: Object
+        },
+
+        /**
+         * (Output)
+         *
+         * Results of event drops timeline query after processed through transform function.
+         *
+         * @type {Object}
+         */
+        data: {
+          notify: true,
+          type: Object
+        },
+
+        /**
+         * (Optional)
+         *
+         * The property of the objects in the data containing the name to display for that data. Used by `<drops-timeline>` element.
+         *
+         * @type {String}
+         * @default 'name'
+         */
+        nameProperty: {
+          type: String,
+          value: 'name'
+        },
+
+        /**
+         * (Optional)
+         *
+         * The property of the objects in the data containing the date to display for that data. Used by `<drops-timeline>` element.
+         *
+         * @type {String}
+         * @default 'date'
+         */
+        dateProperty: {
+          type: String,
+          value: 'date'
+        },
+
+        /**
+         * (Optional)
+         *
+         * The property of the objects in the data containing the count for that data. Used by `<drops-timeline>` element.
+         *
+         * @type {String}
+         * @default 'count'
+         */
+        countProperty: {
+          type: String,
+          value: 'count'
+        },
+
+        /**
+         * Result of date histogram aggregation query.
+         *
+         * @type {Object}
+         * @private
+         */
+        _dateAggregation: {
+          type: Object
+        },
+
+        /**
+         * Result of location aggregation query.
+         *
+         * @type {Object}
+         * @private
+         */
+        _locationAggregation: {
+          type: Object
+        },
+
+        /**
+         * Results of event drops timeline query.
+         *
+         * @type {Object}
+         * @private
+         */
+        _queryResults: {
+          type: Object
+        },
+
+        /**
+         * The info tooltip for the chart.
+         *
+         * @type {String}
+         * @private
+         */
+        _info: {
+          type: String
+        }
+      },
+
+      /**
+       * Toggles the help text.
+       *
+       * @private
+       */
+      _toggleEventDropsTimelineHelp: function() {
+        this.$$('#eventDropsTimelineHelp').toggle();
+      }
+    });
+  })();
+  </script>
+</dom-module>
