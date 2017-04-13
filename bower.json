@@ -1,7 +1,7 @@
 {
   "name": "drops-query-and-timeline",
   "description": "A Polymer Element that does an elasticsearch query and uses the results to create a timeline display.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "authors": [
     "Next Century Corporation"
   ],
@@ -21,7 +21,7 @@
   ],
   "dependencies": {
     "polymer": "Polymer/polymer#^1.7.0",
-    "array-behavior": "DigElements/array-behavior#^1.0.1",
+    "array-behavior": "DigElements/array-behavior#^1.0.2",
     "drops-timeline": "DigElements/drops-timeline#^1.0.0",
     "elastic-client": "DigElements/elastic-client#^1.0.3",
     "elastic-client-aggregation-builder": "DigElements/elastic-client-aggregation-builder#^1.0.8",
