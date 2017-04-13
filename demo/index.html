@@ -40,7 +40,12 @@ limitations under the License.
         values='"TN"'
         ejs-query="{{tennAdsQuery}}">
       </elastic-client-query-builder>
-     
+
+      Cluster Status: {{myStatus}}<br/>
+      Index: 'mockads'<br/>
+      Index Types: ["ad"]<br/>
+      <span>ElasticJS query: </span>{{stringify(tennAdsQuery)}}<br/><br/>
+
       <drops-query-and-timeline
         client="[[esclient]]"
         index="mockads"
@@ -57,6 +62,10 @@ limitations under the License.
     <script>
       (function(document) {
         var demo = document.querySelector('#demo');
+
+        demo.stringify = function(ejs) {
+            return JSON.stringify(ejs);
+        };
 
         demo.createEventDropsTimeline = function(buckets) {
           var locations = [];
