@@ -1,7 +1,7 @@
 {
   "name": "drops-query-and-timeline",
   "description": "A Polymer Element that does an elasticsearch query and uses the results to create a timeline display.",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "authors": [
     "Next Century Corporation"
   ],
