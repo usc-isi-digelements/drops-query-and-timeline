@@ -15,15 +15,15 @@ limitations under the License.
 -->
 
 <link rel="import" href="../polymer/polymer.html">
-<link rel="import" href="../iron-collapse/iron-collapse.html">
+<link rel="import" href="../array-behavior/array-behavior.html">
+<link rel="import" href="../elastic-client-search/elastic-client-search.html">
+<link rel="import" href="../elastic-client-aggregation-builder/elastic-client-aggregation-builder.html">
+<link rel="import" href="../drops-timeline/drops-timeline.html">
 <link rel="import" href="../iron-flex-layout/iron-flex-layout-classes.html">
 <link rel="import" href="../iron-icon/iron-icon.html">
 <link rel="import" href="../iron-icons/iron-icons.html">
-<link rel="import" href="../elastic-client-search/elastic-client-search.html">
-<link rel="import" href="../elastic-client-aggregation-builder/elastic-client-aggregation-builder.html">
 <link rel="import" href="../json-combine/json-combine.html">
-<link rel="import" href="../drops-timeline/drops-timeline.html">
-<link rel="import" href="../array-behavior/array-behavior.html">
+<link rel="import" href="../loading-spinner/loading-spinner.html">
 
 <!--
 A Polymer Element that does an elasticsearch query and uses the results to create a timeline display.
@@ -35,12 +35,14 @@ A Polymer Element that does an elasticsearch query and uses the results to creat
     index="mockads"
     date-hist-name="dates"
     date-hist-field="date"
-    location-agg-name="locations"
-    location-agg-field="city"
+    item-agg-name="locations"
+    item-agg-field="city"
     index-types='["ad"]'
     filter-list='[]'
     query="[[query]]"
-    transform="[[eventDropsTimeline]]">
+    transform="[[transformFunction]]"
+    dates="{{dates}}"
+    items="{{items}}">
   </drops-query-and-timeline>
 ```
 
@@ -77,32 +79,15 @@ Custom property        | Description                                            
         display: block;
       }
 
-      .info, .help {
+      .info {
         /* Match the style of the label in the zoomable-bar-chart */
         font-size: 14px;
         font-weight: bold;
-      }
-
-      .timeline {
-        margin-top: 20px;
-        margin-bottom: 20px;
-      }
-
-      .help {
-        cursor: pointer;
         margin-bottom: 10px;
       }
 
-      .icon {
-        --iron-icon-height: 20px;
-        --iron-icon-width: 20px;
-        margin-right: 10px;
-      }
-
-      .collapse {
-        font-size: 14px;
-        margin-left: 10px;
-        margin-right: 10px;
+      loading-spinner {
+        margin-top: 10px;
       }
     </style>
 
@@ -115,14 +100,14 @@ Custom property        | Description                                            
     </elastic-client-aggregation-builder>
 
     <elastic-client-aggregation-builder
-      name="[[locationAggName]]"
+      name="[[itemAggName]]"
       type="terms"
       count="0"
       order="_term"
       direction="asc"
-      field="[[locationAggField]]"
+      field="[[itemAggField]]"
       nested-aggregations="[[buildArray(_dateAggregation)]]"
-      ejs-aggregation="{{_locationAggregation}}">
+      ejs-aggregation="{{_itemAggregation}}">
     </elastic-client-aggregation-builder>
 
     <!-- set page size/hits to zero since we only need aggregation here -->
@@ -132,7 +117,7 @@ Custom property        | Description                                            
       index="[[index]]"
       elastic-types="[[indexTypes]]"
       query="[[query]]"
-      aggregations="[[buildArray(_locationAggregation)]]"
+      aggregations="[[buildArray(_itemAggregation)]]"
       filters="[[filterList]]"
       results="{{_queryResults}}"
       loading="{{loading}}"
@@ -141,37 +126,27 @@ Custom property        | Description                                            
 
     <json-combine
       data-in1="[[_queryResults]]"
-      data-in2="[[locationId]]"
-      data-out="{{data}}"
+      data-in2="[[transformConfig]]"
+      data-out="{{_transformResults}}"
       combine-function="[[transform]]">
     </json-combine>
 
-    <div class="layout horizontal center info">
-      [[_info]]
-    </div>
+    <template is="dom-if" if="[[_info]]">
+      <div class="layout horizontal center info">
+        [[_info]]
+      </div>
+    </template>
 
-    <drops-timeline class="timeline"
-      data="[[data.locations]]"
-      timestamps="[[data.dates]]"
+    <drops-timeline
+      data="[[items]]"
+      timestamps="[[dates]]"
       info="{{_info}}"
       name-property="{{nameProperty}}"
       date-property="{{dateProperty}}"
       count-property="{{countProperty}}">
     </drops-timeline> 
 
-    <div class="layout horizontal center help" on-tap="_toggleEventDropsTimelineHelp">
-      <iron-icon icon="help" class="icon"></iron-icon>
-      How to Use the Drops Timeline (Click to Show/Hide)
-    </div>
-
-    <iron-collapse id="eventDropsTimelineHelp" class="collapse">
-      <ul>
-        <li>Click on the timeline and drag left or right to move the date range.</li>
-        <li>Scroll up or down using your mouse wheel to change the date scale.</li>
-        <li>The counts in each label on the left will update based on the current date range.</li>
-        <li>Click the Reset Timeline button at any time to show the original timeline.</li>
-      </ul>
-    </iron-collapse>
+    <loading-spinner show="[[loading]]" type="Timeline"></loading-spinner>
   </template>
   <script>
   (function() {
@@ -254,22 +229,22 @@ Custom property        | Description                                            
         /**
          * (Required)
          *
-         * Name for location aggregation query.
+         * Name for item aggregation query.
          *
          * @type {String}
          */
-        locationAggName: {
+        itemAggName: {
           type: String
         },
 
         /**
          * (Required)
          *
-         * Field to query against for location aggregation query.
+         * Field to query against for item aggregation query.
          *
          * @type {String}
          */
-        locationAggField: {
+        itemAggField: {
           type: String
         },
 
@@ -299,25 +274,53 @@ Custom property        | Description                                            
         /**
          * (Optional)
          *
-         * The location ID to give to the transform.
+         * The transform config object.
          *
-         * @type {Number}
-         * @default null
+         * @type {Object}
+         * @default {}
          */
-        locationId: {
-          type: Number,
-          value: null
+        transformConfig: {
+          type: Object,
+          value: function() {
+            return {};
+          }
         },
 
         /**
          * (Required)
          *
-         * The transform for the event drops timeline query results.
+         * The transform function for the event drops timeline query results.
          *
          * @type {Object}
          */
         transform: {
           type: Object
+        },
+
+        /**
+         * (Optional)
+         *
+         * The dates array property in the transform function results object.
+         *
+         * @type {String}
+         * @default 'dates'
+         */
+        transformDatesProperty: {
+          type: String,
+          value: 'dates'
+        },
+
+        /**
+         * (Optional)
+         *
+         * The dates array property in the transform function results object.
+         *
+         * @type {String}
+         * @default 'items'
+         */
+        transformItemsProperty: {
+          type: String,
+          value: 'items'
         },
 
         /**
@@ -346,13 +349,27 @@ Custom property        | Description                                            
         /**
          * (Output)
          *
-         * Results of event drops timeline query after processed through transform function.
+         * Dates from the output of the transform function on the event drops timeline query results.
          *
-         * @type {Object}
+         * @type {Array}
          */
-        data: {
+        dates: {
+          computed: '_getArray(_transformResults, transformDatesProperty)',
           notify: true,
-          type: Object
+          type: Array
+        },
+
+        /**
+         * (Output)
+         *
+         * Items from the output of the transform function on the event drops timeline query results.
+         *
+         * @type {Array}
+         */
+        items: {
+          computed: '_getArray(_transformResults, transformItemsProperty)',
+          notify: true,
+          type: Array
         },
 
         /**
@@ -405,12 +422,12 @@ Custom property        | Description                                            
         },
 
         /**
-         * Result of location aggregation query.
+         * Result of item aggregation query.
          *
          * @type {Object}
          * @private
          */
-        _locationAggregation: {
+        _itemAggregation: {
           type: Object
         },
 
@@ -421,6 +438,16 @@ Custom property        | Description                                            
          * @private
          */
         _queryResults: {
+          type: Object
+        },
+
+        /**
+         * Results of transform function.
+         *
+         * @type {Object}
+         * @private
+         */
+        _transformResults: {
           type: Object
         },
 
@@ -436,12 +463,15 @@ Custom property        | Description                                            
       },
 
       /**
-       * Toggles the help text.
+       * Returns the array in the given object at the given property.
        *
+       * @param {Object} object
+       * @param {String} property
+       * @return {Array}
        * @private
        */
-      _toggleEventDropsTimelineHelp: function() {
-        this.$$('#eventDropsTimelineHelp').toggle();
+      _getArray: function(object, property) {
+        return object ? object[property] : [];
       }
     });
   })();

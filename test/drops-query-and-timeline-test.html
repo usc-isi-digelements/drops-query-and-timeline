@@ -71,56 +71,56 @@ limitations under the License.
           expect(element._dateAggregation.toJSON()).to.deep.equal(ejs.DateHistogramAggregation('dates').field('date').interval('day').toJSON());
         });
 
-        it('build location aggregations', function() {
-          expect(element._locationAggregation).to.not.exist;
-          element.locationAggName = 'locations';
-          expect(element._locationAggregation).to.not.exist;
-          element.locationAggField = 'city';
-          expect(element._locationAggregation).to.exist;
-          expect(element._locationAggregation.toJSON()).to.deep.equal(ejs.TermsAggregation('locations').field('city').size(0).order('_term', 'asc').aggregation(ejs.DateHistogramAggregation('dates').field('date').interval('day')).toJSON());
+        it('build item aggregations', function() {
+          expect(element._itemAggregation).to.not.exist;
+          element.itemAggName = 'items';
+          expect(element._itemAggregation).to.not.exist;
+          element.itemAggField = 'field';
+          expect(element._itemAggregation).to.exist;
+          expect(element._itemAggregation.toJSON()).to.deep.equal(ejs.TermsAggregation('items').field('field').size(0).order('_term', 'asc').aggregation(ejs.DateHistogramAggregation('dates').field('date').interval('day')).toJSON());
         });
 
         it('transforms query results', function() {
           element._queryResults = [{
-            location: 'Sacramento, CA',
+            item: 'Sacramento, CA',
             count: 1,
             date: new Date('November 14, 2016')
           }];
-          element.locationId = 'testId';
-          element.transform = function(results, locationId) {
+          element.transformConfig = 'testId';
+          element.transform = function(results, itemId) {
             expect(results).to.deep.equal([{
-              location: 'Sacramento, CA',
+              item: 'Sacramento, CA',
               count: 1,
               date: new Date('November 14, 2016')
             }]);
-            expect(locationId).to.equal('testId');
+            expect(itemId).to.equal('testId');
             var dataToReturn = {
-              locations: [],
+              items: [],
               dates: []
             };
             results.forEach(function(result) {
-              dataToReturn.locations.push({
+              dataToReturn.items.push({
                 dates: [{
                   count: result.count,
                   date: result.date,
                   name: 'Sacramento, CA'
                 }],
-                name: result.location
+                name: result.item
               });
               dataToReturn.dates.push(result.date.getTime());
             });
             return dataToReturn;
           };
 
-          expect(element.data.locations.length).to.equal(1);
-          expect(element.data.dates.length).to.equal(1);
-          expect(element.data.locations[0].dates[0]).to.deep.equal({
+          expect(element.items.length).to.equal(1);
+          expect(element.dates.length).to.equal(1);
+          expect(element.items[0].dates[0]).to.deep.equal({
             count: 1,
             date: new Date('November 14, 2016'),
             name: 'Sacramento, CA'
           });
-          expect(element.data.locations[0].name).to.equal('Sacramento, CA');
-          expect(element.data.dates[0]).to.equal(1479099600000);
+          expect(element.items[0].name).to.equal('Sacramento, CA');
+          expect(element.dates[0]).to.equal(1479099600000);
         });
 
         it('shows drops-timeline', function() {
