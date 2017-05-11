@@ -16,8 +16,9 @@ limitations under the License.
 
 <link rel="import" href="../polymer/polymer.html">
 <link rel="import" href="../array-behavior/array-behavior.html">
-<link rel="import" href="../elastic-client-search/elastic-client-search.html">
 <link rel="import" href="../elastic-client-aggregation-builder/elastic-client-aggregation-builder.html">
+<link rel="import" href="../elastic-client-query-builder/elastic-client-query-builder.html">
+<link rel="import" href="../elastic-client-search/elastic-client-search.html">
 <link rel="import" href="../drops-timeline/drops-timeline.html">
 <link rel="import" href="../iron-flex-layout/iron-flex-layout-classes.html">
 <link rel="import" href="../iron-icon/iron-icon.html">
@@ -90,6 +91,13 @@ Custom property        | Description                                            
         margin-top: 10px;
       }
     </style>
+
+    <elastic-client-query-builder
+      type="[[queryType]]"
+      fields="[[queryFields]]"
+      values="[[queryValues]]"
+      ejs-query="{{query}}">
+    </elastic-client-query-builder>
 
     <elastic-client-aggregation-builder
       name="[[dateHistName]]"
@@ -261,14 +269,50 @@ Custom property        | Description                                            
         },
 
         /**
-         * (Required)
+         * (Optional|Output)
          *
-         * Query to get the data to be used for the event drops timeline.
+         * The elasticsearch query object to get the event drops timeline data.  Can be set instead of `queryFields`, `queryType`, and `queryValues`.
          *
          * @type {Object}
          */
         query: {
+          notify: true,
           type: Object
+        },
+
+        /**
+         * (Required)
+         *
+         * The string or array of elasticsearch query fields.  Not required if `query` is set.
+         *
+         * @type {Array}
+         */
+        queryFields: {
+          type: Array
+        },
+
+        /**
+         * (Optional)
+         *
+         * The query type.  Not required if `query` is set.
+         *
+         * @type {String}
+         * @default 'terms'
+         */
+        queryType: {
+          type: String,
+          value: 'terms'
+        },
+
+        /**
+         * (Required)
+         *
+         * The string or array of elasticsearch query values.  Not required if `query` is set.
+         *
+         * @type {Array}
+         */
+        queryValues: {
+          type: Array
         },
 
         /**
