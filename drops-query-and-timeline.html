@@ -127,6 +127,7 @@ Custom property        | Description                                            
       query="[[query]]"
       aggregations="[[buildArray(_itemAggregation)]]"
       filters="[[filterList]]"
+      properties-ready="[[propertiesReady]]"
       results="{{_queryResults}}"
       loading="{{loading}}"
       last-error="{{error}}">
@@ -266,6 +267,19 @@ Custom property        | Description                                            
         filterList: {
           type: Array,
           notify: true
+        },
+
+        /**
+         * (Optional)
+         *
+         * Whether the elasticsearch query is ready to be run.  False forbids the query to be run at all.
+         *
+         * @type {Boolean}
+         * @default true
+         */
+        propertiesReady: {
+          type: Boolean,
+          value: true
         },
 
         /**
